@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX manifest template. make-msix.ps1 fills in the values in double braces and packs it together with the
+  published app (publish\) and the tiles in Assets\.
+
+  For the Microsoft Store, the identity values come from Partner Center
+  (Product management > Product identity): Package/Identity/Name, Package/Identity/Publisher and
+  Package/Properties/PublisherDisplayName must be copied from there exactly.
+-->
+<Package
+    xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+    xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+    xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+    xmlns:desktop2="http://schemas.microsoft.com/appx/manifest/desktop/windows10/2"
+    IgnorableNamespaces="uap rescap desktop2">
+
+  <Identity
+      Name="{{IdentityName}}"
+      Publisher="{{Publisher}}"
+      Version="{{Version}}"
+      ProcessorArchitecture="{{Architecture}}" />
+
+  <Properties>
+    <DisplayName>MirrorDeck</DisplayName>
+    <PublisherDisplayName>{{PublisherDisplayName}}</PublisherDisplayName>
+    <Description>Screen mirroring receiver for Windows, compatible with AirPlay. Show the screen of an iPhone, iPad or Mac on this PC.</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Dependencies>
+    <!-- 10.0.17763 = Windows 10 version 1809, the oldest release every part of the app is known to support -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Capabilities>
+    <!-- Not enforced for full-trust processes; declared so the Store listing shows what the app does. -->
+    <Capability Name="internetClientServer" />
+    <Capability Name="privateNetworkClientServer" />
+    <!-- A WPF app plus a native child process: this is a classic desktop app, not a sandboxed one. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+  <Applications>
+    <Application Id="MirrorDeck" Executable="MirrorDeck.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+          DisplayName="MirrorDeck"
+          Description="Screen mirroring receiver, compatible with AirPlay"
+          BackgroundColor="transparent"
+          Square150x150Logo="Assets\Square150x150Logo.png"
+          Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Extensions>
+    <!--
+      Windows Firewall rules, installed and removed together with the app: no prompt, no elevation.
+      They apply to the engine executable only, and only on Domain and Private networks.
+
+        TCP 7000        AirPlay / RAOP control (RTSP and HTTP)
+        TCP 7001        reserved by the engine
+        TCP 7100        encrypted screen-mirroring video
+        UDP 6000-6001   audio data and audio control
+        UDP 7011        clock synchronisation (NTP)
+        UDP 5353        mDNS: how Apple devices discover the receiver
+
+      The numbers match MirrorDeck.Core/EnginePorts.cs; the engine is started with fixed ports for
+      exactly this reason.
+    -->
+    <desktop2:Extension Category="windows.firewallRules">
+      <desktop2:FirewallRules Executable="engine\bin\uxplay.exe">
+        <desktop2:Rule Direction="in" IPProtocol="TCP" LocalPortMin="7000" LocalPortMax="7001" Profile="domainAndPrivate" />
+        <desktop2:Rule Direction="in" IPProtocol="TCP" LocalPortMin="7100" LocalPortMax="7100" Profile="domainAndPrivate" />
+        <desktop2:Rule Direction="in" IPProtocol="UDP" LocalPortMin="6000" LocalPortMax="6001" Profile="domainAndPrivate" />
+        <desktop2:Rule Direction="in" IPProtocol="UDP" LocalPortMin="7011" LocalPortMax="7011" Profile="domainAndPrivate" />
+        <desktop2:Rule Direction="in" IPProtocol="UDP" LocalPortMin="5353" LocalPortMax="5353" Profile="domainAndPrivate" />
+      </desktop2:FirewallRules>
+    </desktop2:Extension>
+  </Extensions>
+
+</Package>

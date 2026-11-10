@@ -66,9 +66,6 @@ def main() -> None:
     tiles.mkdir(parents=True, exist_ok=True)
     draw(50).save(tiles / "StoreLogo.png")
     draw(44).save(tiles / "Square44x44Logo.png")
-    # unplated variants are what the taskbar and Start list use
-    for n in (16, 24, 32, 48, 256):
-        draw(n).save(tiles / f"Square44x44Logo.targetsize-{n}_altform-unplated.png")
     draw(150, padding=0.14).save(tiles / "Square150x150Logo.png")
     wide = Image.new("RGBA", (310, 150), (0, 0, 0, 0))
     wide.paste(draw(150, padding=0.14), (80, 0))

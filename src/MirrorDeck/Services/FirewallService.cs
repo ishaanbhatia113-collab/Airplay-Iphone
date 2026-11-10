@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Text;
 using MirrorDeck.Core;
 
 namespace MirrorDeck.Services;
@@ -40,8 +39,6 @@ internal sealed record FirewallReport(
 /// </summary>
 internal static class FirewallService
 {
-    public const string RuleName = "MirrorDeck AirPlay receiver";
-
     private const int ProfileDomain = 1;
     private const int ProfilePrivate = 2;
     private const int ProfilePublic = 4;
@@ -124,25 +121,10 @@ internal static class FirewallService
     /// <returns>null on success, otherwise a message for the user.</returns>
     public static async Task<string?> AllowAsync(string enginePath)
     {
-        // The rule is bound to the program instead of to port numbers: it then covers exactly what the
-        // engine does (see EnginePorts for the list) and nothing else on the machine.
-        // Every netsh argument is passed as one quoted PowerShell string. That matters twice: paths may
-        // contain spaces, and an unquoted comma ("profile=private,domain") would be split by PowerShell.
-        var script = new StringBuilder()
-            .AppendLine("$ErrorActionPreference = 'Stop'")
-            .AppendLine($"$program = '{enginePath.Replace("'", "''")}'")
-            // removes stale allow rules and, importantly, the block rules Windows adds after "Cancel";
-            // netsh reports "no rules match" through its exit code, which is fine here
-            .AppendLine("& netsh advfirewall firewall delete rule \"name=all\" \"dir=in\" \"program=$program\" | Out-Null")
-            .AppendLine($"& netsh advfirewall firewall add rule \"name={RuleName}\" \"dir=in\" \"action=allow\" \"program=$program\" \"profile=private,domain\" \"enable=yes\" \"description=Lets Apple devices on your home or work network find this PC and mirror to it.\" | Out-Null")
-            .AppendLine("exit $LASTEXITCODE")
-            .ToString();
-
         var startInfo = new ProcessStartInfo("powershell.exe")
         {
-            // -EncodedCommand sidesteps every quoting problem a path could cause
             Arguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand " +
-                        Convert.ToBase64String(Encoding.Unicode.GetBytes(script)),
+                        FirewallRuleScript.Encode(FirewallRuleScript.Build(enginePath)),
             UseShellExecute = true,
             Verb = "runas",
             WindowStyle = ProcessWindowStyle.Hidden,

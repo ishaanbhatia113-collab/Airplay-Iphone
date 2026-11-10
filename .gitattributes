@@ -1,0 +1,7 @@
+# Shell scripts must keep Unix line endings even when the repository is cloned on Windows:
+# MSYS2's bash cannot run a script with CRLF line endings.
+* text=auto
+*.sh text eol=lf
+*.py text eol=lf
+*.png binary
+*.ico binary

@@ -18,6 +18,7 @@ namespace MirrorDeck.ViewModels;
 public sealed class MainViewModel : ObservableObject
 {
     private const int MaxLogLines = 500;
+    private const long MaxLogFileBytes = 2 * 1024 * 1024;
 
     private static readonly Brush Grey = Frozen(0x8A, 0x8A, 0x8A);
     private static readonly Brush Green = Frozen(0x10, 0x9B, 0x4A);
@@ -43,6 +44,7 @@ public sealed class MainViewModel : ObservableObject
     private bool _diagnosticsRunning;
     private bool _loading;
     private bool _shuttingDown;
+    private long _logFileBytes;
 
     public MainViewModel(Dispatcher dispatcher)
     {
@@ -81,6 +83,7 @@ public sealed class MainViewModel : ObservableObject
 
         LoadForm(SettingsStore.Load());
         ApplyStatus(ReceiverStatus.Stopped);
+        StartLogFile();
     }
 
     // ---------------------------------------------------------------- commands
@@ -411,7 +414,10 @@ public sealed class MainViewModel : ObservableObject
     public async Task InitializeAsync()
     {
         LocateEngine();
-        var willStart = _autoStart && _engine is not null;
+
+        // Also when the engine is missing: the status card then says so right away, instead of
+        // showing a receiver that is merely "off".
+        var willStart = _autoStart;
 
         // Run the checks alongside the start. They are told that the receiver is (about to be) running,
         // otherwise our own engine grabbing its ports could be reported as "another program".
@@ -437,6 +443,7 @@ public sealed class MainViewModel : ObservableObject
         }
         finally
         {
+            FlushLog(); // the engine's last words belong in the log file too
             DisplayAwake.Set(false);
             _host.Dispose();
         }
@@ -578,7 +585,7 @@ public sealed class MainViewModel : ObservableObject
 
             ReceiverState.Stopping => ("Stopping…", "Taking this PC off the AirPlay list.", Amber),
 
-            _ => (FaultTitle(status.Fault), status.FaultDetail ?? "The receiver stopped.", Red),
+            _ => (FaultTitle(status.Fault), FaultText(status), Red),
         };
 
         Pin = status.State == ReceiverState.PinRequired ? status.Pin : null;
@@ -614,6 +621,17 @@ public sealed class MainViewModel : ObservableObject
         EngineFault.StartTimeout => "The receiver did not start",
         _ => "The receiver stopped unexpectedly",
     };
+
+    private static string FaultText(ReceiverStatus status)
+    {
+        var detail = status.FaultDetail ?? "The receiver stopped.";
+
+        // The list of folders that were searched is in the set-up check and in the log; here it only
+        // pushes the rest of the window down.
+        const string searched = " Looked in:";
+        var cut = status.Fault == EngineFault.EngineNotFound ? detail.IndexOf(searched, StringComparison.Ordinal) : -1;
+        return cut > 0 ? detail[..cut] : detail;
+    }
 
     private static string? FaultAdvice(EngineFault fault) => fault switch
     {
@@ -849,9 +867,43 @@ public sealed class MainViewModel : ObservableObject
         }
 
         foreach (var line in lines) _logLines.Enqueue(line);
+        AppendToLogFile(lines);
 
         while (_logLines.Count > MaxLogLines) _logLines.Dequeue();
         LogText = string.Join(Environment.NewLine, _logLines);
+    }
+
+    /// <summary>
+    /// The same lines also go to a file next to the settings ("Open data folder"), so that a bug report
+    /// can include them after the window has been closed. One file per run of the app, capped in size.
+    /// </summary>
+    private void StartLogFile()
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.DataDirectory);
+            File.WriteAllText(AppPaths.EngineLog, $"{VersionText}, started {DateTime.Now:u}{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logFileBytes = MaxLogFileBytes; // not writable: do not try again
+        }
+    }
+
+    private void AppendToLogFile(List<string> lines)
+    {
+        if (_logFileBytes >= MaxLogFileBytes) return;
+        try
+        {
+            var stamp = DateTime.Now.ToString("HH:mm:ss");
+            var text = string.Concat(lines.Select(l => $"{stamp} {l}{Environment.NewLine}"));
+            File.AppendAllText(AppPaths.EngineLog, text);
+            _logFileBytes += text.Length;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logFileBytes = MaxLogFileBytes;
+        }
     }
 
     private void ShowError(Exception exception)
