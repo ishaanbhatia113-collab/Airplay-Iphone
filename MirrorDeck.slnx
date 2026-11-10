@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MirrorDeck.Core/MirrorDeck.Core.csproj" />
+    <Project Path="src/MirrorDeck/MirrorDeck.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MirrorDeck.Core.Tests/MirrorDeck.Core.Tests.csproj" />
+  </Folder>
+</Solution>

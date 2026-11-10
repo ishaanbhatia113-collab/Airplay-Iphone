@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+*.user
+/engine/dist/
+/engine/_work/
+/publish/
+/packaging/out/
+*.msix
+*.pfx

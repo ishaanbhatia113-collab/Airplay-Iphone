@@ -1,0 +1,10 @@
+<Application x:Class="MirrorDeck.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ThemeMode="System"
+             ShutdownMode="OnMainWindowClose">
+    <!--
+        ThemeMode="System" switches on WPF's built-in Fluent theme (Windows 11 look, light and dark
+        following the Windows setting). Delete the attribute to fall back to the classic WPF look.
+    -->
+</Application>

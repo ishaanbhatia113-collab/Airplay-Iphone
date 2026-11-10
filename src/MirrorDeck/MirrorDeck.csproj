@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- lets "dotnet build" compile this Windows-only project on Linux/macOS CI as well -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+
+    <AssemblyName>MirrorDeck</AssemblyName>
+    <RootNamespace>MirrorDeck</RootNamespace>
+    <Product>MirrorDeck</Product>
+    <Description>AirPlay-compatible screen mirroring receiver for Windows</Description>
+    <Copyright>GPL-3.0-or-later. Not affiliated with Apple Inc.</Copyright>
+    <Version>0.1.0</Version>
+
+    <ApplicationIcon>Assets\MirrorDeck.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MirrorDeck.Core\MirrorDeck.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\MirrorDeck.ico" />
+  </ItemGroup>
+
+  <!--
+    The AirPlay engine (UxPlay + GStreamer) is built separately by engine/build-engine.sh into engine/dist.
+    When it is there, it is copied next to the app as "engine\", which is where EngineLocator looks first.
+    Without it the app still builds and runs, and tells the user that the engine is missing.
+  -->
+  <PropertyGroup>
+    <EngineDist>$(MSBuildThisFileDirectory)..\..\engine\dist\</EngineDist>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(EngineDist)bin\uxplay.exe')">
+    <None Include="$(EngineDist)**\*" Link="engine\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\LICENSE" Link="LICENSE.txt" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+</Project>

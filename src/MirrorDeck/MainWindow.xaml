@@ -1,0 +1,277 @@
+<Window x:Class="MirrorDeck.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MirrorDeck"
+        Width="520" Height="860" MinWidth="440" MinHeight="480"
+        WindowStartupLocation="CenterScreen"
+        Icon="/Assets/MirrorDeck.ico">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+        <!-- The brushes are looked up dynamically: they come from the Fluent theme and follow light/dark.
+             Without the theme the lookups simply find nothing and the cards are drawn without a fill. -->
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+        </Style>
+
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.72" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="Problem" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="#D13438" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+    </Window.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="20,16,20,16">
+
+            <!-- ============================== Status ============================== -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <DockPanel LastChildFill="True">
+                        <Button DockPanel.Dock="Right"
+                                Content="{Binding StartStopLabel}"
+                                Command="{Binding StartStopCommand}"
+                                MinWidth="96" Padding="16,6" Margin="12,0,0,0"
+                                VerticalAlignment="Center"
+                                AutomationProperties.Name="Start or stop the receiver" />
+                        <Ellipse DockPanel.Dock="Left" Width="14" Height="14" Margin="0,0,10,0"
+                                 Fill="{Binding StatusBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding StatusTitle}" FontSize="20" FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    </DockPanel>
+
+                    <ProgressBar IsIndeterminate="True" Height="3" Margin="0,10,0,0"
+                                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+
+                    <TextBlock Text="{Binding StatusDetail}" TextWrapping="Wrap" Margin="0,10,0,0" />
+
+                    <!-- the code the Apple device is asking for -->
+                    <Border Margin="0,12,0,0" Padding="12" CornerRadius="6"
+                            BorderThickness="1" BorderBrush="#D98E04"
+                            Visibility="{Binding ShowPin, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="{Binding Pin}" FontFamily="Consolas" FontSize="46" FontWeight="Bold"
+                                   HorizontalAlignment="Center"
+                                   AutomationProperties.Name="Code to enter on the device" />
+                    </Border>
+
+                    <Border Margin="0,12,0,0" Padding="10" CornerRadius="6"
+                            BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                            Visibility="{Binding ShowNotice, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" FontSize="12" />
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0"
+                                Visibility="{Binding IsShowingPicture, Converter={StaticResource BoolToVisibility}}">
+                        <Button Content="Show mirror window" Command="{Binding ShowMirrorWindowCommand}" Padding="12,5" />
+                        <Button Content="Full screen on/off" Command="{Binding ToggleFullscreenCommand}" Padding="12,5" Margin="8,0,0,0"
+                                ToolTip="Same as pressing Alt+Enter in the mirror window" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ============================== Receiver ============================== -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="Receiver" Style="{StaticResource CardTitle}" />
+
+                    <TextBlock Text="Name shown on your Apple devices" Margin="0,0,0,4" />
+                    <TextBox Text="{Binding ReceiverName, UpdateSourceTrigger=PropertyChanged}" MaxLength="50"
+                             AutomationProperties.Name="Receiver name" />
+                    <TextBlock Text="{Binding NameError}" Style="{StaticResource Problem}"
+                               Visibility="{Binding ShowNameError, Converter={StaticResource BoolToVisibility}}" />
+
+                    <CheckBox Content="Start the receiver when MirrorDeck opens" IsChecked="{Binding AutoStart}" Margin="0,12,0,0" />
+
+                    <!-- shown while the engine runs with older settings than the form -->
+                    <StackPanel Margin="0,12,0,0"
+                                Visibility="{Binding HasUnappliedChanges, Converter={StaticResource BoolToVisibility}}">
+                        <Button Content="Apply changes (restarts the receiver)" Command="{Binding ApplyCommand}"
+                                HorizontalAlignment="Left" Padding="12,5" />
+                        <TextBlock Text="A device that is connected right now will be disconnected." Style="{StaticResource Hint}" Margin="0,4,0,0" />
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding FormError}" Style="{StaticResource Problem}"
+                               Visibility="{Binding ShowFormError, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </Border>
+
+            <!-- ============================== Access ============================== -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="Who can connect" Style="{StaticResource CardTitle}" />
+
+                    <RadioButton GroupName="Access" Content="Anyone on this network" IsChecked="{Binding IsAccessOpen}" />
+
+                    <RadioButton GroupName="Access" Content="Code on first connection (pairing)" IsChecked="{Binding IsAccessPairingPin}" Margin="0,6,0,0" />
+                    <StackPanel Margin="28,2,0,0" Visibility="{Binding IsAccessPairingPin, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="A new device has to type a 4-digit code that this window shows. After that it is remembered." />
+                        <Button Content="Forget paired devices…" Command="{Binding ForgetDevicesCommand}"
+                                HorizontalAlignment="Left" Padding="10,4" Margin="0,6,0,0" />
+                    </StackPanel>
+
+                    <RadioButton GroupName="Access" Content="New code for every connection" IsChecked="{Binding IsAccessPinEveryTime}" Margin="0,6,0,0" />
+                    <TextBlock Margin="28,2,0,0" Style="{StaticResource Hint}"
+                               Visibility="{Binding IsAccessPinEveryTime, Converter={StaticResource BoolToVisibility}}"
+                               Text="Each time a device connects, this window shows a fresh 4-digit code to type on the device. Best for meeting rooms and classrooms." />
+
+                    <RadioButton GroupName="Access" Content="Password" IsChecked="{Binding IsAccessPassword}" Margin="0,6,0,0" />
+                    <StackPanel Margin="28,4,0,0" Visibility="{Binding IsAccessPassword, Converter={StaticResource BoolToVisibility}}">
+                        <PasswordBox x:Name="PasswordInput" PasswordChanged="OnPasswordChanged" MaxLength="64"
+                                     AutomationProperties.Name="AirPlay password" />
+                        <TextBlock Text="{Binding PasswordError}" Style="{StaticResource Problem}"
+                                   Visibility="{Binding ShowPasswordError, Converter={StaticResource BoolToVisibility}}" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
+                                   Text="At least 6 characters, no spaces. Devices ask for it once and then remember it. It is stored encrypted for your Windows account." />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ============================== Picture and sound ============================== -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="Picture and sound" Style="{StaticResource CardTitle}" />
+                    <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,8"
+                               Text="The mirrored screen opens in its own window when a device connects. Resize it freely, drag it to another monitor, or press Alt+Enter for full screen." />
+                    <CheckBox Content="Open the mirror window in full screen" IsChecked="{Binding StartFullscreen}" />
+                    <CheckBox Content="Play the device's sound on this PC" IsChecked="{Binding AudioEnabled}" Margin="0,6,0,0" />
+                    <CheckBox Content="Keep the display awake while mirroring" IsChecked="{Binding KeepDisplayAwake}" Margin="0,6,0,0" />
+                </StackPanel>
+            </Border>
+
+            <!-- ============================== Set-up check ============================== -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Check again" Command="{Binding RefreshDiagnosticsCommand}" Padding="10,4" VerticalAlignment="Top" />
+                        <TextBlock Text="Set-up check" Style="{StaticResource CardTitle}" />
+                    </DockPanel>
+                    <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,4"
+                               Text="If this PC does not show up on your iPhone, iPad or Mac, the reason is almost always one of these." />
+
+                    <ItemsControl ItemsSource="{Binding Diagnostics}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="20" Height="20" CornerRadius="10" Margin="0,1,10,0"
+                                            Background="{Binding Brush}" VerticalAlignment="Top">
+                                        <TextBlock Text="{Binding Glyph}" Foreground="White" FontSize="12" FontWeight="Bold"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Hint}" />
+                                        <Button Content="{Binding FixLabel}" Command="{Binding FixCommand}"
+                                                HorizontalAlignment="Left" Padding="10,4" Margin="0,6,0,0"
+                                                Visibility="{Binding HasFix, Converter={StaticResource BoolToVisibility}}" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- ============================== Advanced ============================== -->
+            <Border Style="{StaticResource Card}">
+                <Expander Header="Advanced" IsExpanded="False">
+                    <StackPanel Margin="0,12,0,0">
+
+                        <TextBlock Text="Renderer" Margin="0,0,0,4" />
+                        <ComboBox SelectedIndex="{Binding VideoSinkIndex}" HorizontalAlignment="Left" MinWidth="280">
+                            <ComboBoxItem Content="Direct3D 11 (works everywhere)" />
+                            <ComboBoxItem Content="Direct3D 12 (recent graphics cards)" />
+                            <ComboBoxItem Content="Automatic (no Alt+Enter full screen)" />
+                        </ComboBox>
+
+                        <TextBlock Text="Smoothness" Margin="0,12,0,4" />
+                        <ComboBox SelectedIndex="{Binding FpsIndex}" HorizontalAlignment="Left" MinWidth="280">
+                            <ComboBoxItem Content="Up to 30 frames per second (lighter)" />
+                            <ComboBoxItem Content="Up to 60 frames per second" />
+                        </ComboBox>
+
+                        <CheckBox Content="A newly connecting device takes over from the current one"
+                                  IsChecked="{Binding NewConnectionTakesOver}" Margin="0,12,0,0" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="28,2,0,0"
+                                   Text="When off, a second device is refused until the first one disconnects." />
+
+                        <CheckBox Content="Accept 4K HEVC (H.265) mirroring" IsChecked="{Binding EnableH265}" Margin="0,8,0,0" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="28,2,0,0"
+                                   Text="Only recent Apple devices send it, and this PC needs a graphics card that can decode HEVC. Leave off if the picture stays black." />
+
+                        <CheckBox Content="Video casting from the YouTube app (experimental)" IsChecked="{Binding EnableHls}" Margin="0,8,0,0" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="28,2,0,0"
+                                   Text="Lets the YouTube app hand its video over instead of mirroring the screen. Other apps' casts and all copy-protected video (Netflix, Apple TV+, Disney+ …) are not supported by any open receiver. Needs the full engine bundle (build-engine.sh --all-plugins)." />
+
+                        <TextBlock Text="Engine location (leave empty to use the built-in engine)" Margin="0,14,0,4" />
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Browse…" Command="{Binding BrowseEngineCommand}" Padding="10,4" Margin="8,0,0,0" />
+                            <TextBox Text="{Binding EnginePathOverride, UpdateSourceTrigger=LostFocus}"
+                                     AutomationProperties.Name="Path of uxplay.exe" />
+                        </DockPanel>
+
+                        <TextBlock Text="Extra engine options (one per line, without the leading dash)" Margin="0,14,0,4" />
+                        <TextBox Text="{Binding ExtraEngineOptions, UpdateSourceTrigger=LostFocus}"
+                                 AcceptsReturn="True" TextWrapping="NoWrap" Height="64"
+                                 FontFamily="Consolas" VerticalScrollBarVisibility="Auto"
+                                 AutomationProperties.Name="Extra engine options" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
+                                   Text="For UxPlay options that have no switch here, for example “s 1280x720” or “mp4 recording”. See the UxPlay documentation." />
+                    </StackPanel>
+                </Expander>
+            </Border>
+
+            <!-- ============================== Log ============================== -->
+            <Border Style="{StaticResource Card}">
+                <Expander Header="Engine log" IsExpanded="False">
+                    <StackPanel Margin="0,12,0,0">
+                        <TextBox x:Name="LogBox" Text="{Binding LogText, Mode=OneWay}" IsReadOnly="True"
+                                 Height="240" FontFamily="Consolas" FontSize="11" TextWrapping="NoWrap"
+                                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                 TextChanged="OnLogChanged"
+                                 AutomationProperties.Name="Engine log" />
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="Copy" Command="{Binding CopyLogCommand}" Padding="10,4" />
+                            <Button Content="Open data folder" Command="{Binding OpenDataFolderCommand}" Padding="10,4" Margin="8,0,0,0" />
+                        </StackPanel>
+                    </StackPanel>
+                </Expander>
+            </Border>
+
+            <!-- ============================== About ============================== -->
+            <StackPanel Margin="4,0,4,8">
+                <TextBlock Style="{StaticResource Hint}">
+                    <Run Text="{Binding VersionText, Mode=OneWay}" />
+                    <Run Text="· free software under the GNU GPL v3 · built on UxPlay and GStreamer ·" />
+                    <Hyperlink Command="{Binding OpenLicensesCommand}">licenses</Hyperlink>
+                </TextBlock>
+                <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
+                           Text="MirrorDeck is an independent project and is not affiliated with, endorsed or certified by Apple Inc. AirPlay, iPhone, iPad and Mac are trademarks of Apple Inc." />
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</Window>
