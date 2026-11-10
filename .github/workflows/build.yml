@@ -1,0 +1,120 @@
+# Builds everything on clean machines and hands back a ready-to-run Windows build:
+#   - Linux: the full test suite, including the tests that run a real UxPlay and browse for it over mDNS
+#   - Windows: the AirPlay engine (MSYS2), a start-up check of the bundled engine, the tests, the
+#     self-contained app, and optionally an MSIX package
+#
+# It only runs when started by hand (Actions tab > "build" > "Run workflow"). Windows runners are billed
+# at twice the rate of Linux ones and an engine build downloads a lot, so nothing here runs on push.
+# To build on every push, add "push:" under "on:".
+#
+# NOTE: this workflow was written without the possibility of running it. The scripts it calls were
+# exercised locally (see "What has been verified" in the README), the workflow itself was not.
+name: build
+
+on:
+  workflow_dispatch:
+    inputs:
+      all_plugins:
+        description: Bundle every GStreamer plugin (needed for YouTube casting; a much larger download)
+        type: boolean
+        default: false
+      msix:
+        description: Also produce an MSIX package signed with a throw-away test certificate
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests with the real engine (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build UxPlay at the pinned commit
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ pkg-config libssl-dev libplist-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libav
+          commit="$(sed -n 's/^UXPLAY_COMMIT="${UXPLAY_COMMIT:-\(.*\)}"$/\1/p' engine/build-engine.sh)"
+          test -n "$commit"
+          git init -q "$RUNNER_TEMP/UxPlay"
+          cd "$RUNNER_TEMP/UxPlay"
+          git fetch -q --depth 1 https://github.com/FDH2/UxPlay.git "$commit"
+          git checkout -q FETCH_HEAD
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNO_MARCH_NATIVE=ON
+          cmake --build build
+
+      - name: Test
+        run: dotnet test MirrorDeck.slnx --configuration Release
+        env:
+          MIRRORDECK_TEST_ENGINE: ${{ runner.temp }}/UxPlay/build/uxplay
+          MIRRORDECK_TEST_PWSH: /usr/bin/pwsh
+
+  windows:
+    name: Windows app and engine
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+
+      - name: Build the AirPlay engine
+        shell: msys2 {0}
+        run: ./engine/build-engine.sh ${{ inputs.all_plugins && '--all-plugins' || '' }}
+
+      - name: Start the bundled engine once
+        shell: pwsh
+        run: ./scripts/smoke-test-engine.ps1
+
+      - name: Test
+        run: dotnet test MirrorDeck.slnx --configuration Release
+
+      - name: Publish the app
+        shell: pwsh
+        run: ./scripts/publish.ps1
+
+      - name: Pack MSIX
+        if: ${{ inputs.msix }}
+        shell: pwsh
+        run: ./packaging/make-msix.ps1 -SelfSign -PublishDirectory publish
+
+      - name: Upload the app
+        uses: actions/upload-artifact@v4
+        with:
+          name: MirrorDeck-win-x64
+          path: publish
+          retention-days: 5
+          if-no-files-found: error
+
+      - name: Upload the MSIX package
+        if: ${{ inputs.msix }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: MirrorDeck-msix
+          path: |
+            packaging/out/*.msix
+            packaging/out/*.cer
+          retention-days: 5
+          if-no-files-found: error
